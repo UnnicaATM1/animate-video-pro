@@ -1,0 +1,53 @@
+{
+  "name": "@joao_lopes/animate",
+  "version": "0.1.0",
+  "description": "Framework Animate Video Pro: narração → vídeo animado. Instalador multi-harness (Claude Code, Codex, Antigravity, Gemini CLI, Cursor, OpenCode, Copilot).",
+  "type": "module",
+  "bin": {
+    "animate": "bin/cli.js",
+    "animate-video-pro": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/cli.js",
+    "doctor": "node bin/cli.js doctor",
+    "import-core": "node scripts/import-core.js",
+    "test": "node scripts/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "agent-skills",
+    "claude-code",
+    "codex",
+    "antigravity",
+    "video",
+    "remotion",
+    "hyperframes",
+    "whisperx"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^1.9.0",
+    "picocolors": "^1.1.1"
+  },
+  "author": "João Lopes (@joao_lopes)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UnnicaATM1/animate-video-pro.git"
+  },
+  "homepage": "https://github.com/UnnicaATM1/animate-video-pro#readme",
+  "bugs": {
+    "url": "https://github.com/UnnicaATM1/animate-video-pro/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
