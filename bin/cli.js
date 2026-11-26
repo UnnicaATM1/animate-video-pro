@@ -67,7 +67,28 @@ if (cmd === 'uninstall') {
 if (cmd !== 'install') { console.log(HELP); process.exit(1); }
 
 // ───────────────────────── instalação ─────────────────────────
-const nonInteractive = !!flag('yes') || !process.stdin.isTTY;
+const noTTY = !process.stdin.isTTY || !process.stdout.isTTY;
+if (noTTY && !flag('yes') && !flag('dry-run')) {
+  // Rodando dentro de um agente (Codex, Claude Code, Antigravity…) ou de um pipe:
+  // não há como mostrar o painel. Explica em vez de instalar em silêncio.
+  console.log(`
+Animate Video Pro · instalador v${VERSION}
+
+O painel de instalação precisa de um terminal de verdade, e este aqui não é
+interativo (provavelmente você rodou o comando dentro do chat de um agente).
+
+  1) Abra o PowerShell, Windows Terminal, Terminal do macOS ou similar
+  2) Rode:  npx -y github:UnnicaATM1/animate-video-pro install
+
+Quer instalar daqui mesmo, sem o painel? Use o modo direto:
+
+  npx -y github:UnnicaATM1/animate-video-pro install --yes --harness=claude-code,codex --formats=9:16,16:9
+
+Opções: npx -y github:UnnicaATM1/animate-video-pro help
+Nada foi instalado.`);
+  process.exit(0);
+}
+const nonInteractive = !!flag('yes') || noTTY;
 await playIntro({ animate: !flag('no-anim') && !nonInteractive });
 
 const detected = detectInstalled();
