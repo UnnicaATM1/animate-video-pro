@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
+import fs from 'node:fs';
 import { playIntro, grad, rgb, RESET, colorOK, REEL_FRAMES } from './logo.js';
 import { HARNESSES, detectInstalled, byId } from './harnesses.js';
 import { FORMATS, FPS, RENDERERS, MODULE_PACKS, fmt } from './options.js';
@@ -9,6 +10,7 @@ import {
   tilde, VERSION, SKILL_NAME,
 } from './install.js';
 import { printDoctor } from './doctor.js';
+import { canOpenWindow, openInstallerWindow } from './window.js';
 
 // ───────────────────────── argumentos ─────────────────────────
 const argv = process.argv.slice(2);
@@ -35,8 +37,24 @@ ${pc.bold('@joao_lopes/animate')} v${VERSION}  ${pc.dim('· Animate Video Pro')}
     --formats=9:16,16:9         ${pc.dim(FORMATS.map((f) => f.id).join(' | '))}
     --primary=9:16              formato padrão
     --fps=30  --renderer=remotion|hyperframes|auto  --modules=essencial|visual|completo
-    --overwrite=backup|replace|skip   --dry-run   --no-anim
+    --overwrite=backup|replace|skip   --dry-run   --no-anim   --no-window
 `;
+
+// --hold: usado quando o instalador abre numa janela própria. Antes de sair,
+// espera Enter para a pessoa conseguir ler o resultado.
+if (flag('hold') && process.stdin.isTTY) {
+  const realExit = process.exit.bind(process);
+  process.exit = (code = 0) => {
+    process.stdout.write(`\n${pc.dim('Pressione Enter para fechar esta janela…')}`);
+    try { process.stdin.setRawMode?.(false); } catch {}
+    const buf = Buffer.alloc(1);
+    for (;;) {
+      try { if (fs.readSync(0, buf, 0, 1) === 0 || buf[0] === 10 || buf[0] === 13) break; }
+      catch (e) { if (e.code !== 'EAGAIN') break; Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); }
+    }
+    realExit(code);
+  };
+}
 
 const brand = (s, t = 0.5) => (colorOK() ? rgb(grad(t)) + s + RESET : s);
 const bail = (v) => { if (p.isCancel(v)) { p.cancel('Instalação cancelada. Nada foi alterado.'); process.exit(0); } return v; };
@@ -69,13 +87,25 @@ if (cmd !== 'install') { console.log(HELP); process.exit(1); }
 // ───────────────────────── instalação ─────────────────────────
 const noTTY = !process.stdin.isTTY || !process.stdout.isTTY;
 if (noTTY && !flag('yes') && !flag('dry-run')) {
-  // Rodando dentro de um agente (Codex, Claude Code, Antigravity…) ou de um pipe:
-  // não há como mostrar o painel. Explica em vez de instalar em silêncio.
+  // Rodando dentro de um agente (Codex, Claude Code, Antigravity…): não há terminal
+  // aqui, então abre uma janela nova com a animação e o painel de escolhas.
+  const opened = !flag('no-window') && canOpenWindow()
+    ? await openInstallerWindow(argv.filter((a) => a !== 'install'))
+    : null;
+  if (opened) {
+    console.log(`
+Animate Video Pro · instalador v${VERSION}
+
+Abri o instalador numa janela nova (${opened}).
+Faça as escolhas lá: agentes, formatos de vídeo e padrões.
+Nada é instalado até você confirmar nessa janela.`);
+    process.exit(0);
+  }
   console.log(`
 Animate Video Pro · instalador v${VERSION}
 
-O painel de instalação precisa de um terminal de verdade, e este aqui não é
-interativo (provavelmente você rodou o comando dentro do chat de um agente).
+O painel de instalação precisa de um terminal de verdade, e não consegui abrir
+uma janela daqui (provavelmente você rodou o comando dentro do chat de um agente).
 
   1) Abra o PowerShell, Windows Terminal, Terminal do macOS ou similar
   2) Rode:  npx -y github:UnnicaATM1/animate-video-pro install
@@ -220,3 +250,4 @@ if (nonInteractive) {
   p.note(`${how}\n\n${pc.dim('Mande um áudio e peça o vídeo. Os formatos escolhidos ficam em animate.config.json.')}`, 'Como chamar');
   p.outro(`${brand('Pronto!', 0.9)} Confira o ambiente com ${pc.cyan('npx @joao_lopes/animate doctor')}`);
 }
+process.exit(0);

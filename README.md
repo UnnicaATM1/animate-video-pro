@@ -21,9 +21,10 @@ Direto do GitHub, sem passar pelo npm:
 npx -y github:UnnicaATM1/animate-video-pro install
 ```
 
-> **Rode num terminal de verdade** (PowerShell, Windows Terminal, Terminal do macOS).
-> Dentro do chat do Codex, Claude Code ou Antigravity não aparece o painel, porque o agente
-> executa comandos sem terminal interativo. Nesse caso use o modo direto:
+> **Chamou de dentro do Codex, Claude Code ou Antigravity?** O instalador abre sozinho uma
+> janela de terminal nova com a animação e o painel de escolhas (Windows Terminal ou Prompt
+> de Comando no Windows, Terminal no macOS, o terminal padrão no Linux). Sem tela disponível
+> (SSH, CI), use o modo direto:
 >
 > ```bash
 > npx -y github:UnnicaATM1/animate-video-pro install --yes --harness=claude-code,codex --formats=9:16

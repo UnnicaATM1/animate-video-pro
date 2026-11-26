@@ -1487,6 +1487,7 @@ var i = `${styleText("gray", S_BAR)}  `;
 
 // src/cli.js
 var import_picocolors2 = __toESM(require_picocolors(), 1);
+import fs5 from "node:fs";
 
 // src/logo.js
 var LOGO = [
@@ -1920,6 +1921,84 @@ function printDoctor() {
   return missing.length === 0;
 }
 
+// src/window.js
+import { spawn, spawnSync as spawnSync2 } from "node:child_process";
+import fs4 from "node:fs";
+var has = (cmd2) => {
+  const r2 = process.platform === "win32" ? spawnSync2("where", [cmd2], { stdio: "ignore", windowsHide: true }) : spawnSync2("sh", ["-c", `command -v ${cmd2}`], { stdio: "ignore" });
+  return r2.status === 0;
+};
+var shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+function canOpenWindow() {
+  const e = process.env;
+  if (e.CI || e.ANIMATE_NO_WINDOW || e.SSH_CONNECTION || e.SSH_TTY) return false;
+  if (process.platform === "linux" && !e.DISPLAY && !e.WAYLAND_DISPLAY) return false;
+  return ["win32", "darwin", "linux"].includes(process.platform);
+}
+function launch(cmd2, args, opts = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done2 = (ok) => {
+      if (!settled) {
+        settled = true;
+        resolve(ok);
+      }
+    };
+    try {
+      const child = spawn(cmd2, args, { detached: true, stdio: "ignore", windowsHide: false, ...opts });
+      child.once("error", () => done2(false));
+      child.once("exit", (code) => done2(code === 0 || code === null));
+      setTimeout(() => {
+        child.unref();
+        done2(true);
+      }, 1500);
+    } catch {
+      done2(false);
+    }
+  });
+}
+async function openInstallerWindow(extraArgs = []) {
+  const node = process.execPath;
+  const script = fs4.realpathSync(process.argv[1]);
+  const cwd = process.cwd();
+  const title = "Animate Video Pro";
+  const args = [script, "install", ...extraArgs, "--hold"];
+  if (process.platform === "win32") {
+    const q = (a2) => `"${a2}"`;
+    if (has("wt")) {
+      if (await launch("wt.exe", ["-w", "new", "--title", title, "-d", cwd, node, ...args])) return "Windows Terminal";
+    }
+    const line2 = ["start", q(title), "/D", q(cwd), q(node), ...args.map(q)].join(" ");
+    if (await launch("cmd.exe", ["/d", "/s", "/c", `"${line2}"`], { windowsVerbatimArguments: true })) return "Prompt de Comando";
+    return null;
+  }
+  const line = `cd ${shq(cwd)} && ${[node, ...args].map(shq).join(" ")}`;
+  if (process.platform === "darwin") {
+    const as = JSON.stringify(line);
+    const ok = await launch("osascript", [
+      "-e",
+      `tell application "Terminal" to do script ${as}`,
+      "-e",
+      'tell application "Terminal" to activate'
+    ]);
+    return ok ? "Terminal" : null;
+  }
+  const held = line;
+  const candidates = [
+    ["x-terminal-emulator", ["-e", "sh", "-c", held]],
+    ["gnome-terminal", ["--title", title, "--", "sh", "-c", held]],
+    ["konsole", ["-e", "sh", "-c", held]],
+    ["xfce4-terminal", ["--title", title, "-x", "sh", "-c", held]],
+    ["kitty", ["sh", "-c", held]],
+    ["alacritty", ["-e", "sh", "-c", held]],
+    ["xterm", ["-T", title, "-e", "sh", "-c", held]]
+  ];
+  for (const [cmd2, a2] of candidates) {
+    if (has(cmd2) && await launch(cmd2, a2)) return cmd2;
+  }
+  return null;
+}
+
 // src/cli.js
 var argv = process.argv.slice(2);
 var cmd = argv[0] && !argv[0].startsWith("-") ? argv[0] : "install";
@@ -1944,8 +2023,29 @@ ${import_picocolors2.default.bold("@joao_lopes/animate")} v${VERSION}  ${import_
     --formats=9:16,16:9         ${import_picocolors2.default.dim(FORMATS.map((f) => f.id).join(" | "))}
     --primary=9:16              formato padr\xE3o
     --fps=30  --renderer=remotion|hyperframes|auto  --modules=essencial|visual|completo
-    --overwrite=backup|replace|skip   --dry-run   --no-anim
+    --overwrite=backup|replace|skip   --dry-run   --no-anim   --no-window
 `;
+if (flag("hold") && process.stdin.isTTY) {
+  const realExit = process.exit.bind(process);
+  process.exit = (code = 0) => {
+    process.stdout.write(`
+${import_picocolors2.default.dim("Pressione Enter para fechar esta janela\u2026")}`);
+    try {
+      process.stdin.setRawMode?.(false);
+    } catch {
+    }
+    const buf = Buffer.alloc(1);
+    for (; ; ) {
+      try {
+        if (fs5.readSync(0, buf, 0, 1) === 0 || buf[0] === 10 || buf[0] === 13) break;
+      } catch (e) {
+        if (e.code !== "EAGAIN") break;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+      }
+    }
+    realExit(code);
+  };
+}
 var brand = (s, t2 = 0.5) => colorOK() ? rgb(grad(t2)) + s + RESET : s;
 var bail = (v) => {
   if (isCancel(v)) {
@@ -1996,11 +2096,21 @@ if (cmd !== "install") {
 }
 var noTTY = !process.stdin.isTTY || !process.stdout.isTTY;
 if (noTTY && !flag("yes") && !flag("dry-run")) {
+  const opened = !flag("no-window") && canOpenWindow() ? await openInstallerWindow(argv.filter((a2) => a2 !== "install")) : null;
+  if (opened) {
+    console.log(`
+Animate Video Pro \xB7 instalador v${VERSION}
+
+Abri o instalador numa janela nova (${opened}).
+Fa\xE7a as escolhas l\xE1: agentes, formatos de v\xEDdeo e padr\xF5es.
+Nada \xE9 instalado at\xE9 voc\xEA confirmar nessa janela.`);
+    process.exit(0);
+  }
   console.log(`
 Animate Video Pro \xB7 instalador v${VERSION}
 
-O painel de instala\xE7\xE3o precisa de um terminal de verdade, e este aqui n\xE3o \xE9
-interativo (provavelmente voc\xEA rodou o comando dentro do chat de um agente).
+O painel de instala\xE7\xE3o precisa de um terminal de verdade, e n\xE3o consegui abrir
+uma janela daqui (provavelmente voc\xEA rodou o comando dentro do chat de um agente).
 
   1) Abra o PowerShell, Windows Terminal, Terminal do macOS ou similar
   2) Rode:  npx -y github:UnnicaATM1/animate-video-pro install
@@ -2143,3 +2253,4 @@ ${done.length} pasta(s) ${dryRun ? "seriam instaladas (dry-run)" : "instaladas"}
 ${import_picocolors2.default.dim("Mande um \xE1udio e pe\xE7a o v\xEDdeo. Os formatos escolhidos ficam em animate.config.json.")}`, "Como chamar");
   outro(`${brand("Pronto!", 0.9)} Confira o ambiente com ${import_picocolors2.default.cyan("npx @joao_lopes/animate doctor")}`);
 }
+process.exit(0);
