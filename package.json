@@ -9,7 +9,6 @@
   },
   "files": [
     "bin",
-    "src",
     "skill",
     "README.md",
     "LICENSE"
@@ -18,7 +17,8 @@
     "start": "node bin/cli.js",
     "doctor": "node bin/cli.js doctor",
     "import-core": "node scripts/import-core.js",
-    "test": "node scripts/smoke-test.js"
+    "test": "npm run build && node scripts/smoke-test.js",
+    "build": "esbuild src/cli.js --bundle --platform=node --format=esm --target=node20 --legal-comments=none --outfile=bin/cli.js"
   },
   "engines": {
     "node": ">=20"
@@ -34,10 +34,6 @@
     "whisperx"
   ],
   "license": "MIT",
-  "dependencies": {
-    "@clack/prompts": "^1.9.0",
-    "picocolors": "^1.1.1"
-  },
   "author": "João Lopes (@joao_lopes)",
   "repository": {
     "type": "git",
@@ -49,5 +45,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@clack/prompts": "^1.9.0",
+    "picocolors": "^1.1.1",
+    "esbuild": "^0.25.12"
   }
 }
